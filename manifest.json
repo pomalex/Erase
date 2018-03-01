@@ -1,0 +1,31 @@
+{
+	"manifest_version": 2,
+
+	"name": "Erase",
+	"version": "1.0",
+
+	"icons": {
+		"16": "/images/icon16x16.png",
+		"32": "/images/icon32x32.png",
+		"48": "/images/icon48x48.png",
+		"128": "/images/icon128x128.png"
+	},
+
+	"permissions": [
+		"history",
+		"storage",
+		"tabs"
+	],
+
+	"content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self'",
+
+	"background": {
+		"scripts": [ "/js/background.js" ],
+		"persistent": true
+	},
+
+	"browser_action": {
+        "default_title": "Erase",
+        "default_icon": "/images/icon48x48.png"
+    }
+}
