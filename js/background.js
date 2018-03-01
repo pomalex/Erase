@@ -43,7 +43,7 @@ const badDomains = [
 	// "instagram.com",
 	// "messenger.com",
 	// "pinterest.com",
-	"https://vk.com"
+	"vk.com"
 
 ];
 
@@ -85,11 +85,11 @@ function clearNewHistory (callback) {
 
 
 
-// If a user has some browser activity -- e.g. open any link in a new tab, click some link in current tab, etc --
-// we track this changes and retrive url user visits. Then we check this url -- whether its domain contain one of
+
+// We track changes in History and retrive url user has just visited. Then we check this url -- whether its domain contain one of
 // prohibited domains from our list. If so -- we instantly delete this url from user's History
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+chrome.history.onVisited.addListener((historyItem) => {
 
 	const url = changeInfo.url
 
@@ -105,14 +105,6 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 			}
 		}
 	}
-})
-
-
-
-chrome.history.onVisited.addListener((historyItem) => {
-
-
-	// Перенести сюда всю эту вкладочную логику
 
 })
 
@@ -178,7 +170,44 @@ function isDomainContainsStr (url, str) {
 // Function does history search by given string and also allows to specify time range 
 // if time range is not specified, it defaults timeFrom to 0 ("epoch time"), and timeTo -- to current time
 
-function getHistoryUrls (searchStr, timeFrom, timeTo) {
+// function getHistoryUrls (searchStr, timeFrom, timeTo) {
+
+// 	if (!timeFrom) {
+// 		timeFrom = 0
+// 	}
+
+// 	if (!timeTo) {
+// 		timeTo = Date.now()
+// 	}
+
+//     return new Promise ((resolve, reject) => {
+
+//     	const params = {
+//     		text: searchStr,
+//     		startTime: timeFrom,
+//     		endTime: timeTo,
+//     		maxResults: 1000000000
+//     	}
+
+//         chrome.history.search(params, (historyItems) => {
+
+//         	const urls = []
+
+// 		    for (let i = 0; i < historyItems.length; i++) {
+
+// 		    	let url = historyItems[i].url
+// 		    	if (url) {
+// 		    		urls.push(url)
+// 		    	}
+// 		    }
+
+//     		resolve({ searchStr: searchStr, urls: urls })
+// 		})
+//     })
+// }
+
+
+function getHistoryUrls (timeFrom, timeTo) {
 
 	if (!timeFrom) {
 		timeFrom = 0
@@ -191,7 +220,7 @@ function getHistoryUrls (searchStr, timeFrom, timeTo) {
     return new Promise ((resolve, reject) => {
 
     	const params = {
-    		text: searchStr,
+    		text: "",
     		startTime: timeFrom,
     		endTime: timeTo,
     		maxResults: 1000000000
@@ -209,7 +238,7 @@ function getHistoryUrls (searchStr, timeFrom, timeTo) {
 		    	}
 		    }
 
-    		resolve({ searchStr: searchStr, urls: urls })
+    		resolve({ urls: urls })
 		})
     })
 }
