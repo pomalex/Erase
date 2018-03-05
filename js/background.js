@@ -23,12 +23,37 @@ TODO:
 ПОЧЕМУ-ТО НЕ ВЫДАЁТ УРЛЫ, СОДЕРЖАЩИЕ ПРЯМО ССЫЛКИ С УКАЗАННЫМ КЕЙВОРДОМ
 
 -разобраться с проблемой зависания и устранить
-
--подключить гит в среду разработки
--создать локальный репо
 -создать публичный репо на гитхабе
 
 -
+
+
+Если я вбиваю один адрес, а браузер редиректит, то в Хистори попадает адрес редиректа
+а первоначальный нет, но он зато всплывает как подсказка в адресной строке -- как удалить????
+
+ПОПРОБОВАТЬ СПЕРВА ОЧИСТИТЬ БРАУЗЕРНУЮ ДАТУ ЦЕЛИКОМ, А ПОТОМ ПОЛЬЗОВАТЬСЯ РАСШИРЕНИЕМ
+
+Поискать как получать список подсказок ещё -- мб это поможет
+
+-если тереть браузерную дату, то можно брать промежутками -- чтобы оставался материал для тестирования
+-чем вообще отличается стирание истории через хистори апи от стирания её же через браузердату?
+
+
+Две стратегии:
+
+-убираем всю историю за раз и потом устраняем любые новые попадания
+-убираем 
+
+
+TODO:
+
+-попробовать удалять куки (СПЕРВА РАЗОБРАТЬСЯ КАК ОНИ УДАЮЛЯЮТСЯ!! СМ. Рашсирение)
+-попробовать удалять браузерхистори (Изучить как работает)
+-????
+-поискать расширение
+-погуглить, узнать -- мб вся суть в том, что хром синхронизирует историю и всё остальное с гугл-аккаунтом
+
+https://bugs.chromium.org/p/chromium/issues/detail?id=395955
 
 */
 
@@ -57,7 +82,7 @@ chrome.storage.local.remove("lastCheck");
 
 	clearNewHistory (() => { // We're clearing the History and then setting the timer to do it again after intervalInSeconds
 
-		setTimeout (scheduleAutoClearing, intervalInSeconds * 1000, intervalInSeconds)
+		//setTimeout (scheduleAutoClearing, intervalInSeconds * 1000, intervalInSeconds)
 	})
 	
 })(clearInterval)
@@ -86,12 +111,17 @@ function clearNewHistory (callback) {
 
 
 
+
 // We track changes in History and retrive url user has just visited. Then we check this url -- whether its domain contain one of
 // prohibited domains from our list. If so -- we instantly delete this url from user's History
 
 chrome.history.onVisited.addListener((historyItem) => {
 
-	const url = changeInfo.url
+	const url = historyItem.url
+
+	const timeStamp = Date.now() - 250
+
+	LOG ("onVisited: ", url)
 
 	if (url) {
 
@@ -101,6 +131,9 @@ chrome.history.onVisited.addListener((historyItem) => {
 
 			if (isDomainContainsStr (url, domain)) {
 				deleteUrl (url)
+				chrome.browsingData.remove({ since: timeStamp }, { history: true }, () => {
+
+				})
 				break
 			}
 		}
@@ -110,36 +143,125 @@ chrome.history.onVisited.addListener((historyItem) => {
 
 
 
+// window.removeCookiesAndHistory = function (domain) {
+
+// 	chrome.history.search({ text: '', startTime: 0, maxResults: 10000000}, (historyItems) => {
+
+// 	    for (let i in historyItems) {
+
+// 	    	let url = historyItems[i].url
+// 	    	if (url && isDomainContainsStr(url, domain)) {
+// 	    		chrome.history.deleteUrl ({ url: url }, ((url) => {
+	    			
+// 	    			return () => {
+// 	    				console.log ("DELETE FROM HISTORY: %s", url)
+// 	    			}
+
+// 	    		})(url))
+// 	    	}
+// 	    }
+
+// 	    chrome.cookies.getAll({ domain: domain }, (cookies) => {
+
+// 			console.log ("COOKIES: ", cookies)
+
+// 			for (let i in cookies) {
+
+// 				const cookie = cookies[i]
+
+// 				console.log ("%s) ", i, cookie)
+
+// 				if (("." + domain).indexOf(cookie.domain) >= 0) {
+// 			  		url = "http" + (cookie.secure ? "s" : "") + "://" + cookie.domain + cookie.path
+// 			  		chrome.cookies.remove({"url": url, "name": cookie.name}, ((url, name) => {
+
+// 			  			return () => {
+// 			  				console.log ("DELETE COOKIE: %s FOR URL: %s", name, url)
+// 			  			}
+
+// 			  		})(url, cookie.name))
+// 				}
+// 			}
+// 		})
+// 	})
+// }
+
+
 // Clears the history for all given domains
 
 function clearHistory (domains, timeFrom, timeTo) {
 
-	const promises = []
+	return getHistoryUrls (timeFrom, timeTo).then(({ urls }) => {
 
-	for (let i = 0; i < domains.length; i++) {
+		const promises = []
 
-		getHistoryUrls (domains[i], timeFrom, timeTo).then(({ urls, searchStr }) => {
+		for (let j = 0; j < urls.length; j++) {
 
-			for (let j = 0; j < urls.length; j++) {
+			const url = urls[j]
 
-				const url = urls[j]
+			for (let i = 0; i < domains.length; i++) {
 
-				if (isDomainContainsStr (url, searchStr)) {
+				// Check if domain we pass here (e.g. "twitter.com") is a part of real domain in a url:
+				// Example 1: https://twitter.com/somePath - right match
+				// Example 2: https://somesite.com/somePath?param=twitter.com - wrong match
 
-					// Check if domain we pass here (e.g. "twitter.com") is a part of real domain in a url:
-					// Example 1: https://twitter.com/somePath - right match
-					// Example 2: https://somesite.com/somePath?param=twitter.com - wrong match
+				if (isDomainContainsStr (url, domains[i])) {
 
-					const promise = deleteUrl(url)
-					promises.push(promise)
+					LOG ("URL TO DELETION: ", url)
+
+					// const promise = deleteUrl(url)
+					// promises.push(promise)
+
+					chrome.history.deleteUrl({ url: url }, ((url) => {
+
+						return () => {
+							LOG ("DELETED: %s", url, arguments)
+						}
+						
+					})(url)) // Deletes url from user's History
+
+					break
 				}
+		
 			}
-			
-		})
-	}
+		}
 
-	return Promise.all(promises).then((results)=>{})
+		// return Promise.all(promises).then((results)=>{
+		// 	LOG ("PROMISE ALL RESULTS: ", results)
+		// })
+		
+	})
+
 }
+
+// function clearHistory (domains, timeFrom, timeTo) {
+
+// 	const promises = []
+
+// 	for (let i = 0; i < domains.length; i++) {
+
+// 		getHistoryUrls (domains[i], timeFrom, timeTo).then(({ urls, searchStr }) => {
+
+// 			for (let j = 0; j < urls.length; j++) {
+
+// 				const url = urls[j]
+
+// 				if (isDomainContainsStr (url, searchStr)) {
+
+// 					// Check if domain we pass here (e.g. "twitter.com") is a part of real domain in a url:
+// 					// Example 1: https://twitter.com/somePath - right match
+// 					// Example 2: https://somesite.com/somePath?param=twitter.com - wrong match
+
+// 					const promise = deleteUrl(url)
+// 					promises.push(promise)
+// 				}
+// 			}
+			
+// 		})
+// 	}
+
+// 	return Promise.all(promises).then((results)=>{})
+// }
 
 
 
@@ -149,7 +271,12 @@ function deleteUrl (url) {
 
 	return new Promise ((resolve, reject) => {
 
-    	chrome.history.deleteUrl({ url: url }, resolve) // Deletes url from user's History
+    	chrome.history.deleteUrl({ url: url }, () => {
+
+    		LOG ("DELETED: %s", url, arguments)
+    		resolve()
+
+    	}) // Deletes url from user's History
     })
 }
 
