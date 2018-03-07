@@ -1,61 +1,4 @@
 
-/*
-
-For this job, you will create a Chrome Extension that always removes certain sites from autocomplete.
-The problem: When people type "F" into Chrome, it will autocomplete "Facebook.com" and this will draw people
-back into Facebook to waste time.
-
-The solution: This browser plugin will ensure that Facebook, and a few other sites, will never autocomplete.
-It will save people time and prevent them from being sucked back into distracting sites.
-Spec: Design a plugin that ensures that the following URL's never autocomplete in Chrome:
-
-
-The working title of the program is "Erase." You will deliver code, instructions to build the plugin,
-and a packaged extension that can be tested in Chrome
-
-TODO:
-
--щас такая проблнма -- вызов history.search не возвращает всю инфу нужную
--попробовать цеплять хттп и хттпс
--потыркаться ещё всяко, поиграть с параметрами
--поискать ответы на стековерфлоу
-
-ПОЧЕМУ-ТО НЕ ВЫДАЁТ УРЛЫ, СОДЕРЖАЩИЕ ПРЯМО ССЫЛКИ С УКАЗАННЫМ КЕЙВОРДОМ
-
--разобраться с проблемой зависания и устранить
--создать публичный репо на гитхабе
-
--
-
-
-Если я вбиваю один адрес, а браузер редиректит, то в Хистори попадает адрес редиректа
-а первоначальный нет, но он зато всплывает как подсказка в адресной строке -- как удалить????
-
-ПОПРОБОВАТЬ СПЕРВА ОЧИСТИТЬ БРАУЗЕРНУЮ ДАТУ ЦЕЛИКОМ, А ПОТОМ ПОЛЬЗОВАТЬСЯ РАСШИРЕНИЕМ
-
-Поискать как получать список подсказок ещё -- мб это поможет
-
--если тереть браузерную дату, то можно брать промежутками -- чтобы оставался материал для тестирования
--чем вообще отличается стирание истории через хистори апи от стирания её же через браузердату?
-
-
-Две стратегии:
-
--убираем всю историю за раз и потом устраняем любые новые попадания
--убираем 
-
-
-TODO:
-
--попробовать удалять куки (СПЕРВА РАЗОБРАТЬСЯ КАК ОНИ УДАЮЛЯЮТСЯ!! СМ. Рашсирение)
--попробовать удалять браузерхистори (Изучить как работает)
--????
--поискать расширение
--погуглить, узнать -- мб вся суть в том, что хром синхронизирует историю и всё остальное с гугл-аккаунтом
-
-https://bugs.chromium.org/p/chromium/issues/detail?id=395955
-
-*/
 
 const clearInterval = 30 // Every 30 seconds by default
 
@@ -63,16 +6,15 @@ const LOG = console.log
 
 const badDomains = [
 
-	// "facebook.com",
-	// "twitter.com",
-	// "instagram.com",
-	// "messenger.com",
-	// "pinterest.com",
-	"vk.com"
-
+	"facebook.com",
+	"twitter.com",
+	"instagram.com",
+	"messenger.com",
+	"pinterest.com",
+	
+	// Any other domains can be added to this list (don't forget to separate them by commas)
 ];
 
-chrome.storage.local.remove("lastCheck");
 
 
 // Entry point (extension starts):
@@ -82,7 +24,7 @@ chrome.storage.local.remove("lastCheck");
 
 	clearNewHistory (() => { // We're clearing the History and then setting the timer to do it again after intervalInSeconds
 
-		//setTimeout (scheduleAutoClearing, intervalInSeconds * 1000, intervalInSeconds)
+		setTimeout (scheduleAutoClearing, intervalInSeconds * 1000, intervalInSeconds)
 	})
 	
 })(clearInterval)
@@ -103,6 +45,13 @@ function clearNewHistory (callback) {
 
     		chrome.storage.local.set({ lastCheck: Date.now() - 3000 }, callback) // Set lastCheck time to current time minus 3 seconds -- a little gap
 			// to avoid the situation when user visits some site and it gets into History just before we've saved lastCheck
+
+			if (!result.lastCheck) { // If extension was launched first time
+				
+				removeBrowsingHistory (0) // Removes all browsing hitory at once
+
+				LOG ("Removed all browsing history")
+			}
     	})
     })
 }
@@ -112,8 +61,9 @@ function clearNewHistory (callback) {
 
 
 
-// We track changes in History and retrive url user has just visited. Then we check this url -- whether its domain contain one of
-// prohibited domains from our list. If so -- we instantly delete this url from user's History
+// We track changes in History and retrive url user has just visited. Then we check this url -- whether its domain contains one of
+// prohibited domains from our list. If so -- we instantly delete this url from user's History (and clean Browsing History at the same time --
+// cutting off very last entry in browsing history, which corresponds to one of bad urls)
 
 chrome.history.onVisited.addListener((historyItem) => {
 
@@ -131,9 +81,7 @@ chrome.history.onVisited.addListener((historyItem) => {
 
 			if (isDomainContainsStr (url, domain)) {
 				deleteUrl (url)
-				chrome.browsingData.remove({ since: timeStamp }, { history: true }, () => {
-
-				})
+				removeBrowsingHistory (timeStamp)
 				break
 			}
 		}
@@ -142,49 +90,14 @@ chrome.history.onVisited.addListener((historyItem) => {
 })
 
 
+function removeBrowsingHistory (fromTimeMs) {
+	
+	return new Promise ((resolve, reject) => {
 
-// window.removeCookiesAndHistory = function (domain) {
+    	chrome.browsingData.remove({ since: fromTimeMs }, { history: true }, resolve)
+    })
+}
 
-// 	chrome.history.search({ text: '', startTime: 0, maxResults: 10000000}, (historyItems) => {
-
-// 	    for (let i in historyItems) {
-
-// 	    	let url = historyItems[i].url
-// 	    	if (url && isDomainContainsStr(url, domain)) {
-// 	    		chrome.history.deleteUrl ({ url: url }, ((url) => {
-	    			
-// 	    			return () => {
-// 	    				console.log ("DELETE FROM HISTORY: %s", url)
-// 	    			}
-
-// 	    		})(url))
-// 	    	}
-// 	    }
-
-// 	    chrome.cookies.getAll({ domain: domain }, (cookies) => {
-
-// 			console.log ("COOKIES: ", cookies)
-
-// 			for (let i in cookies) {
-
-// 				const cookie = cookies[i]
-
-// 				console.log ("%s) ", i, cookie)
-
-// 				if (("." + domain).indexOf(cookie.domain) >= 0) {
-// 			  		url = "http" + (cookie.secure ? "s" : "") + "://" + cookie.domain + cookie.path
-// 			  		chrome.cookies.remove({"url": url, "name": cookie.name}, ((url, name) => {
-
-// 			  			return () => {
-// 			  				console.log ("DELETE COOKIE: %s FOR URL: %s", name, url)
-// 			  			}
-
-// 			  		})(url, cookie.name))
-// 				}
-// 			}
-// 		})
-// 	})
-// }
 
 
 // Clears the history for all given domains
@@ -209,16 +122,8 @@ function clearHistory (domains, timeFrom, timeTo) {
 
 					LOG ("URL TO DELETION: ", url)
 
-					// const promise = deleteUrl(url)
-					// promises.push(promise)
-
-					chrome.history.deleteUrl({ url: url }, ((url) => {
-
-						return () => {
-							LOG ("DELETED: %s", url, arguments)
-						}
-						
-					})(url)) // Deletes url from user's History
+					const promise = deleteUrl(url)
+					promises.push(promise)
 
 					break
 				}
@@ -226,42 +131,10 @@ function clearHistory (domains, timeFrom, timeTo) {
 			}
 		}
 
-		// return Promise.all(promises).then((results)=>{
-		// 	LOG ("PROMISE ALL RESULTS: ", results)
-		// })
+		return Promise.all(promises).then((results)=>{})
 		
 	})
-
 }
-
-// function clearHistory (domains, timeFrom, timeTo) {
-
-// 	const promises = []
-
-// 	for (let i = 0; i < domains.length; i++) {
-
-// 		getHistoryUrls (domains[i], timeFrom, timeTo).then(({ urls, searchStr }) => {
-
-// 			for (let j = 0; j < urls.length; j++) {
-
-// 				const url = urls[j]
-
-// 				if (isDomainContainsStr (url, searchStr)) {
-
-// 					// Check if domain we pass here (e.g. "twitter.com") is a part of real domain in a url:
-// 					// Example 1: https://twitter.com/somePath - right match
-// 					// Example 2: https://somesite.com/somePath?param=twitter.com - wrong match
-
-// 					const promise = deleteUrl(url)
-// 					promises.push(promise)
-// 				}
-// 			}
-			
-// 		})
-// 	}
-
-// 	return Promise.all(promises).then((results)=>{})
-// }
 
 
 
@@ -294,45 +167,7 @@ function isDomainContainsStr (url, str) {
 
 
 
-// Function does history search by given string and also allows to specify time range 
-// if time range is not specified, it defaults timeFrom to 0 ("epoch time"), and timeTo -- to current time
-
-// function getHistoryUrls (searchStr, timeFrom, timeTo) {
-
-// 	if (!timeFrom) {
-// 		timeFrom = 0
-// 	}
-
-// 	if (!timeTo) {
-// 		timeTo = Date.now()
-// 	}
-
-//     return new Promise ((resolve, reject) => {
-
-//     	const params = {
-//     		text: searchStr,
-//     		startTime: timeFrom,
-//     		endTime: timeTo,
-//     		maxResults: 1000000000
-//     	}
-
-//         chrome.history.search(params, (historyItems) => {
-
-//         	const urls = []
-
-// 		    for (let i = 0; i < historyItems.length; i++) {
-
-// 		    	let url = historyItems[i].url
-// 		    	if (url) {
-// 		    		urls.push(url)
-// 		    	}
-// 		    }
-
-//     		resolve({ searchStr: searchStr, urls: urls })
-// 		})
-//     })
-// }
-
+// Function retrieces all History (by default) -- it's possible to specify time range, if some params passed
 
 function getHistoryUrls (timeFrom, timeTo) {
 
@@ -369,3 +204,5 @@ function getHistoryUrls (timeFrom, timeTo) {
 		})
     })
 }
+
+
